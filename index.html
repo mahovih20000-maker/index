@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Генератор приказов</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 950px; margin: 40px auto; padding: 0 20px; background: #f5f5f5; }
+  h1 { color: #2c3e50; }
+  .form-block { background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+  label { display: block; font-weight: bold; margin: 10px 0 3px; color: #34495e; }
+  input, select { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+  .input-with-hint { position: relative; }
+  .hint-list { position: absolute; z-index: 100; background: white; border: 1px solid #ccc; border-radius: 4px; width: 100%; max-height: 150px; overflow-y: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+  .hint-item { padding: 8px 12px; cursor: pointer; font-size: 14px; }
+  .hint-item:hover { background: #e8f4fd; }
+  .person-block { border: 1px solid #d0e4f0; border-radius: 6px; padding: 14px 16px; margin-top: 12px; background: #f0f7fc; position: relative; }
+  .person-title { font-weight: bold; color: #1a5276; margin-bottom: 6px; font-size: 13px; }
+  .remove-btn { position: absolute; top: 10px; right: 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; padding: 3px 10px; cursor: pointer; font-size: 13px; }
+  .remove-btn:hover { background: #c0392b; }
+  .add-btn { margin-top: 12px; padding: 8px 20px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+  .add-btn:hover { background: #1e8449; }
+  .gen-btn { margin-top: 16px; padding: 10px 28px; background: #2980b9; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 15px; }
+  .gen-btn:hover { background: #1a6fa3; }
+  .genitive-preview { font-size: 12px; color: #7f8c8d; margin-top: 2px; min-height: 16px; }
+  .genitive-preview span { color: #27ae60; font-style: italic; }
+  #preview {
+    background: white; padding: 60px 70px; border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    font-family: "Times New Roman", serif; font-size: 12pt;
+    line-height: 1; display: none;
+  }
+  #preview p, #preview div { margin: 0; padding: 0; line-height: 1; }
+  .pr-center  { text-align: center; }
+  .pr-bold    { font-weight: bold; }
+  .pr-justify { text-align: justify; }
+  .pr-gap     { height: 12pt; display: block; }
+  .pr-header-table { width: 100%; border-collapse: collapse; }
+  .pr-header-table td { border: none; padding: 0; font-size: 12pt; line-height: 1.3; }
+  .pr-sign-table { width: 100%; border-collapse: collapse; }
+  .pr-sign-table td { border: none; padding: 0; font-weight: bold; font-size: 12pt; line-height: 1; }
+  .pr-annex-table { width: 100%; border-collapse: collapse; }
+  .pr-annex-table th { border: 1px solid #000; padding: 4px 6px; text-align: center; font-size: 12pt; font-weight: bold; background: #f0f0f0; }
+  .pr-annex-table td { border: 1px solid #000; padding: 4px 6px; font-size: 12pt; text-align: left; }
+  .pr-annex-table td:first-child { text-align: center; }
+  .page-break-label { border-top: 3px dashed #aaa; margin: 24px 0 16px; text-align: center; color: #aaa; font-size: 11px; }
+  .btn-row { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+  .btn-docx { background: #1a5276; color: white; border: none; border-radius: 4px; padding: 10px 24px; cursor: pointer; font-size: 15px; }
+  .btn-docx:hover { background: #154360; }
+  .btn-copy { background: #27ae60; color: white; border: none; border-radius: 4px; padding: 10px 24px; cursor: pointer; font-size: 15px; }
+  .btn-copy:hover { background: #1e8449; }
+  .status { padding: 8px 14px; border-radius: 4px; margin-top: 10px; font-size: 13px; display: none; }
+  .status.ok  { background: #d4edda; color: #155724; display: block; }
+  .status.err { background: #f8d7da; color: #721c24; display: block; }
+  .info-badge { background: #d6eaf8; color: #1a5276; border-radius: 4px; padding: 8px 14px; font-size: 13px; margin-bottom: 12px; }
+  .saved-tag  { font-size: 11px; color: #27ae60; margin-left: 6px; }
+</style>
+</head>
+<body>
+
+<h1>📄 Генератор приказов</h1>
+
+<div class="form-block">
+  <label>Тип приказа:</label>
+  <select id="templateSelect" onchange="renderFields()">
+    <option value="">— Выберите тип приказа —</option>
+    <option value="tosi">Приказ о назначении ответственного за ТО СИ</option>
+    <option value="bosi">Приказ о назначении ответственного за БО СИ</option>
+  </select>
+  <div id="baseFields"></div>
+  <div id="personsBlock"></div>
+  <div id="addBtnWrap" style="display:none">
+    <button class="add-btn" onclick="addPerson()">＋ Добавить ответственного</button>
+  </div>
+  <br>
+  <button class="gen-btn" onclick="generateDoc()">▶ Сформировать документ</button>
+</div>
+
+<div id="statusMsg" class="status"></div>
+<div id="preview"></div>
+<div class="btn-row" id="btnRow" style="display:none">
+  <button class="btn-docx" onclick="downloadDocx()">📄 Скачать .docx (Word)</button>
+  <button class="btn-copy" onclick="copyDoc()">📋 Скопировать текст</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/petrovich/petrovich.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+
+const DIRECTOR      = "Емельяненко Максим Сергеевич";
+const DIRECTOR_POST = "Директор ООО «СТДВ»";
+const FONT = "Times New Roman";
+const SZ   = 24;
+const SZ_S = 24;
+const MONTHS = ["января","февраля","марта","апреля","мая","июня",
+                "июля","августа","сентября","октября","ноября","декабря"];
+const STORAGE_CONTRACTS = "prikaz_contracts";
+const STORAGE_OBJECTS   = "prikaz_objects";
+const STORAGE_SHEETS    = "prikaz_sheets_url";
+
+// =============================================
+//  ВШИТЫЙ URL — менять здесь при необходимости
+// =============================================
+const SHEETS_URL_DEFAULT = "https://script.google.com/macros/s/AKfycbxY4tc95PzxzfALM8FZ6WQlyMtGBpkdjOgozMCvG-QBj-Tk-V8X3S-YEmgGJfcsQW8I/exec";
+
+// =============================================
+//  localStorage
+// =============================================
+function getSaved(key){ try{return JSON.parse(localStorage.getItem(key))||[];}catch(e){return[];} }
+function addSaved(key,value){
+  if(!value) return;
+  let arr=getSaved(key);
+  if(!arr.includes(value)){arr.unshift(value);if(arr.length>20)arr=arr.slice(0,20);}
+  localStorage.setItem(key,JSON.stringify(arr));
+}
+function getSheetsUrl(){ return SHEETS_URL_DEFAULT; }
+
+// =============================================
+//  ПОДСКАЗКИ
+// =============================================
+function showHints(inputId,storageKey){
+  hideHints(inputId);
+  const inp=document.getElementById(inputId);
+  const val=inp.value.toLowerCase();
+  const all=getSaved(storageKey).filter(v=>v.toLowerCase().includes(val));
+  if(!all.length) return;
+  const list=document.createElement("div");
+  list.className="hint-list"; list.id="hint_"+inputId;
+  all.forEach(v=>{
+    const item=document.createElement("div");
+    item.className="hint-item"; item.textContent=v;
+    item.onmousedown=()=>{inp.value=v;hideHints(inputId);};
+    list.appendChild(item);
+  });
+  inp.parentNode.style.position="relative";
+  inp.parentNode.appendChild(list);
+}
+function hideHints(inputId){const el=document.getElementById("hint_"+inputId);if(el)el.remove();}
+
+// =============================================
+//  СКЛОНЕНИЕ ФИО
+// =============================================
+function declineFullName(fullName){
+  if(typeof petrovich==="undefined") return fullName;
+  const parts=fullName.trim().split(/\s+/);
+  if(parts.length<2) return fullName;
+  try{
+    const last=parts[0]||"",first=parts[1]||"",middle=parts[2]||"";
+    const gender=middle.endsWith("на")?"female":"male";
+    let r="";
+    if(last)   r+=(petrovich[gender].last.genitive   ?petrovich[gender].last.genitive(last)    :last)+" ";
+    if(first)  r+=(petrovich[gender].first.genitive  ?petrovich[gender].first.genitive(first)  :first)+" ";
+    if(middle) r+=(petrovich[gender].middle.genitive ?petrovich[gender].middle.genitive(middle):middle);
+    return r.trim()||fullName;
+  }catch(e){return fullName;}
+}
+
+function updateGenitivePreview(idx){
+  const fioEl=document.getElementById(`p_fio_${idx}`);
+  const pEl  =document.getElementById(`p_gen_${idx}`);
+  if(!fioEl||!pEl) return;
+  const fio=fioEl.value.trim();
+  if(!fio){pEl.innerHTML="";return;}
+  pEl.innerHTML=`Родительный падеж: <span>${declineFullName(fio)}</span>`;
+}
+
+// =============================================
+//  ШАБЛОНЫ
+// =============================================
+const templates={
+  tosi:{
+    name:"Приказ ТО СИ",
+    baseFields:[
+      {id:"num",     label:"Номер приказа",   hint:"Присваивается автоматически"},
+      {id:"date",    label:"Дата приказа",    type:"date"},
+      {id:"contract",label:"Номер договора",  storage:STORAGE_CONTRACTS},
+      {id:"object",  label:"Название объекта",storage:STORAGE_OBJECTS},
+    ],
+    subject: (f)=>`О назначении ответственного лица за техническое обслуживание средств измерений (ТО СИ) на объекте «${f.object}»`,
+    preamble:(f)=>`В целях обеспечения надлежащего технического обслуживания средств измерений в соответствии с требованиями Федерального закона от 26.06.2008 № 102-ФЗ «Об обеспечении единства измерений», а также во исполнение Договора № ${f.contract},`,
+    points:(f,persons)=>[
+      `Назначить ответственным лицом за техническое обслуживание средств измерений (ТО СИ) на объекте «${f.object}»: ${persons.map(p=>`${p.position} — ${p.fioGen}`).join("; ")}.`,
+      `Ответственному лицу в своей деятельности руководствоваться требованиями Федерального закона № 102-ФЗ, межповерочными интервалами, установленными изготовителями СИ, а также условиями Договора № ${f.contract}.`,
+      `Обеспечить своевременное проведение поверки, калибровки и ремонта средств измерений, а также ведение учётной документации по СИ.`,
+      `Контроль за исполнением настоящего приказа оставляю за собой.`,
+    ],
+    annexRef:(f)=>`к Приказу № ${f.num} от ${fmtLong(f.date)}`,
+  },
+  bosi:{
+    name:"Приказ БО СИ",
+    baseFields:[
+      {id:"num",     label:"Номер приказа",   hint:"Присваивается автоматически"},
+      {id:"date",    label:"Дата приказа",    type:"date"},
+      {id:"contract",label:"Номер договора",  storage:STORAGE_CONTRACTS},
+      {id:"object",  label:"Название объекта",storage:STORAGE_OBJECTS},
+    ],
+    subject: (f)=>`О назначении ответственного лица за безопасную эксплуатацию средств измерений (БО СИ) на объекте «${f.object}»`,
+    preamble:(f)=>`В целях обеспечения безопасной эксплуатации средств измерений и соблюдения требований промышленной безопасности на объекте «${f.object}», а также во исполнение Договора № ${f.contract},`,
+    points:(f,persons)=>[
+      `Назначить ответственным лицом за безопасную эксплуатацию средств измерений (БО СИ) на объекте «${f.object}»: ${persons.map(p=>`${p.position} — ${p.fioGen}`).join("; ")}.`,
+      `Ответственному лицу обеспечить: соблюдение требований эксплуатационной документации на СИ; проведение инструктажей персонала, работающего с СИ; немедленное выведение из эксплуатации неисправных СИ; ведение журнала учёта технического состояния СИ.`,
+      `Ответственному лицу руководствоваться условиями Договора № ${f.contract} и действующими нормативными документами в области метрологии и промышленной безопасности.`,
+      `Контроль за исполнением настоящего приказа оставляю за собой.`,
+    ],
+    annexRef:(f)=>`к Приказу № ${f.num} от ${fmtLong(f.date)}`,
+  },
+};
+
+// =============================================
+//  УТИЛИТЫ
+// =============================================
+function fmtLong(d){
+  if(!d) return "___";
+  const [y,m,dd]=d.split("-");
+  return `${parseInt(dd)} ${MONTHS[parseInt(m)-1]} ${y} г.`;
+}
+function esc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+                  .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function showStatus(msg,isErr){
+  const el=document.getElementById("statusMsg");
+  el.className="status "+(isErr?"err":"ok");
+  el.textContent=msg;
+  setTimeout(()=>el.style.display="none",6000);
+}
+
+// =============================================
+//  ФОРМА
+// =============================================
+let personCount=0;
+
+function renderFields(){
+  const key=document.getElementById("templateSelect").value;
+  ["baseFields","personsBlock"].forEach(id=>document.getElementById(id).innerHTML="");
+  document.getElementById("addBtnWrap").style.display="none";
+  document.getElementById("preview").style.display="none";
+  document.getElementById("btnRow").style.display="none";
+  personCount=0;
+  if(!key) return;
+  const bf=document.getElementById("baseFields");
+
+  bf.innerHTML+=`<div class="info-badge">🔢 Номер приказа будет присвоен автоматически из Google Sheets</div>
+    <input type="hidden" id="field_num" value="auto">`;
+
+  templates[key].baseFields.filter(f=>f.id!=="num").forEach(f=>{
+    const saved=f.storage?getSaved(f.storage):[];
+    const mark=saved.length?`<span class="saved-tag">💾 ${saved.length} сохранено</span>`:"";
+    bf.innerHTML+=`<label>${f.label}: ${mark}</label>
+      <div class="input-with-hint">
+        <input type="${f.type||'text'}" id="field_${f.id}" placeholder="${f.hint||f.label}"
+          ${f.storage?`oninput="showHints('field_${f.id}','${f.storage}')" onfocus="showHints('field_${f.id}','${f.storage}')" onblur="setTimeout(()=>hideHints('field_${f.id}'),200)"`:""}
+        >
+      </div>`;
+  });
+  document.getElementById("addBtnWrap").style.display="block";
+  addPerson();
+}
+
+function addPerson(){
+  personCount++;
+  const idx=personCount;
+  const d=document.createElement("div");
+  d.className="person-block"; d.id=`person_${idx}`;
+  d.innerHTML=`<div class="person-title">Ответственный № ${idx}</div>
+    ${idx>1?`<button class="remove-btn" onclick="removePerson(${idx})">✕ Удалить</button>`:""}
+    <label>ФИО (именительный падеж):</label>
+    <input type="text" id="p_fio_${idx}" placeholder="Иванов Иван Иванович"
+      oninput="updateGenitivePreview(${idx})">
+    <div class="genitive-preview" id="p_gen_${idx}"></div>
+    <label>Должность:</label>
+    <input type="text" id="p_pos_${idx}" placeholder="Ведущий инженер ПТО">`;
+  document.getElementById("personsBlock").appendChild(d);
+}
+
+function removePerson(idx){const el=document.getElementById(`person_${idx}`);if(el)el.remove();}
+
+function getBase(key){
+  const v={num:"auto"}; let ok=true;
+  templates[key].baseFields.filter(f=>f.id!=="num").forEach(f=>{
+    const el=document.getElementById("field_"+f.id);
+    v[f.id]=el?el.value.trim():"";
+    if(!v[f.id]){if(el)el.style.border="1.5px solid red";ok=false;}
+    else if(el) el.style.border="1px solid #ccc";
+  });
+  return ok?v:null;
+}
+
+function getPersons(){
+  const list=[];
+  for(let i=1;i<=personCount;i++){
+    const fe=document.getElementById(`p_fio_${i}`),pe=document.getElementById(`p_pos_${i}`);
+    if(!fe) continue;
+    const fio=fe.value.trim(),pos=pe.value.trim();
+    if(!fio||!pos){if(!fio)fe.style.border="1.5px solid red";if(!pos)pe.style.border="1.5px solid red";return null;}
+    fe.style.border=pe.style.border="1px solid #ccc";
+    list.push({fio,fioGen:declineFullName(fio),position:pos});
+  }
+  return list.length?list:null;
+}
+
+// =============================================
+//  GOOGLE SHEETS
+// =============================================
+async function getNextNumFromSheets(key,f,persons){
+  const url=getSheetsUrl();
+  if(!url) return null;
+  try{
+    // Сначала GET — получаем номер
+    const getResp=await fetch(url,{method:"GET"});
+    const getData=await getResp.json();
+    if(!getData.num) return null;
+    const num=String(getData.num);
+
+    // Затем POST — записываем строку
+    await fetch(url,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        object:  f.object,
+        date:    fmtLong(f.date),
+        fio:     persons.map(p=>p.fio).join("; "),
+        subject: templates[key].subject(f),
+      })
+    });
+    return num;
+  }catch(e){
+    console.error("Sheets error:",e);
+    return null;
+  }
+}
+
+// =============================================
+//  ГЕНЕРАЦИЯ
+// =============================================
+async function generateDoc(){
+  const key=document.getElementById("templateSelect").value;
+  if(!key){alert("Выберите тип приказа!");return;}
+  const f=getBase(key),persons=getPersons();
+  if(!f||!persons){alert("Заполните все поля!");return;}
+
+  addSaved(STORAGE_CONTRACTS,f.contract);
+  addSaved(STORAGE_OBJECTS,f.object);
+
+  showStatus("⏳ Получаем номер из Google Sheets...",false);
+  const num=await getNextNumFromSheets(key,f,persons);
+  if(num){f.num=num;showStatus(`✅ Номер ${num} записан в Google Sheets!`,false);}
+  else{showStatus("⚠️ Не удалось получить номер. Укажите вручную.",true);return;}
+
+  const tpl=templates[key],pts=tpl.points(f,persons);
+
+  let rows="";
+  persons.forEach((p,i)=>{rows+=`<tr><td>${i+1}</td><td>${p.fio}</td><td>${p.position}</td><td></td><td></td></tr>`;});
+  const extra=Math.max(15-persons.length,5);
+  for(let i=persons.length;i<persons.length+extra;i++){
+    rows+=`<tr><td>${i+1}</td><td></td><td></td><td></td><td></td></tr>`;
+  }
+
+  document.getElementById("preview").innerHTML=`
+    <p class="pr-center pr-bold">ПРИКАЗ</p>
+    <span class="pr-gap"></span>
+    <table class="pr-header-table">
+      <tr>
+        <td style="width:65%;font-weight:bold">№ ${f.num}</td>
+        <td style="text-align:right;font-weight:bold">${fmtLong(f.date)}</td>
+      </tr>
+      <tr>
+        <td style="width:60%;font-weight:bold;vertical-align:top">${tpl.subject(f)}</td>
+        <td style="width:40%"></td>
+      </tr>
+    </table>
+    <span class="pr-gap"></span>
+    <p class="pr-justify">${tpl.preamble(f)}</p>
+    <span class="pr-gap"></span>
+    <p class="pr-bold">ПРИКАЗЫВАЮ:</p>
+    <span class="pr-gap"></span>
+    ${pts.map((p,i)=>`<p class="pr-justify">${i+1}. ${p}</p><span class="pr-gap"></span>`).join("")}
+    <table class="pr-sign-table">
+      <tr>
+        <td style="width:50%;text-align:left">${DIRECTOR_POST}</td>
+        <td style="text-align:right">${DIRECTOR}</td>
+      </tr>
+    </table>
+    <div class="page-break-label">— — — Приложение № 1 (новая страница при печати) — — —</div>
+    <p class="pr-center pr-bold">Приложение № 1</p>
+    <p class="pr-center">${tpl.annexRef(f)}</p>
+    <span class="pr-gap"></span>
+    <p class="pr-center pr-bold" style="text-decoration:underline">ЛИСТ ОЗНАКОМЛЕНИЯ</p>
+    <span class="pr-gap"></span>
+    <table class="pr-annex-table">
+      <thead><tr>
+        <th style="width:7%">№ п/п</th><th style="width:27%">ФИО</th>
+        <th style="width:28%">Должность</th><th style="width:22%">Дата ознакомления</th>
+        <th style="width:16%">Подпись</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  document.getElementById("preview").style.display="block";
+  document.getElementById("btnRow").style.display="flex";
+  window._lastKey=key; window._lastValues=f; window._lastPersons=persons;
+}
+
+// =============================================
+//  XML-УТИЛИТЫ
+// =============================================
+const SP=`<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>`;
+
+function rpr(bold=false,sz=SZ){
+  return `<w:rPr>${bold?"<w:b/>":""}<w:rFonts w:ascii="${FONT}" w:hAnsi="${FONT}" w:cs="${FONT}"/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr>`;
+}
+function para(text,opts={}){
+  const{bold=false,center=false,right=false,underline=false,sz=SZ}=opts;
+  const jc=center?`<w:jc w:val="center"/>`:right?`<w:jc w:val="right"/>`:`<w:jc w:val="both"/>`;
+  const u=underline?`<w:u w:val="single"/>`:"";
+  const rp=`<w:rPr>${bold?"<w:b/>":""}${u}<w:rFonts w:ascii="${FONT}" w:hAnsi="${FONT}" w:cs="${FONT}"/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr>`;
+  return `<w:p><w:pPr>${SP}${jc}</w:pPr><w:r>${rp}<w:t xml:space="preserve">${esc(text)}</w:t></w:r></w:p>`;
+}
+function emptyPara(){return `<w:p><w:pPr>${SP}</w:pPr><w:r>${rpr()}<w:t></w:t></w:r></w:p>`;}
+function pageBreak(){return `<w:p><w:r><w:br w:type="page"/></w:r></w:p>`;}
+
+function cell(text,opts={}){
+  const{bold=false,sz=SZ,span=1,center=false,right=false,vis=false,bg="",underline=false}=opts;
+  const gs=span>1?`<w:gridSpan w:val="${span}"/>`:"";
+  const brd=vis
+    ?`<w:top w:val="single" w:sz="4" w:color="000000"/><w:left w:val="single" w:sz="4" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:color="000000"/><w:right w:val="single" w:sz="4" w:color="000000"/>`
+    :`<w:top w:val="none" w:sz="0" w:color="auto"/><w:left w:val="none" w:sz="0" w:color="auto"/><w:bottom w:val="none" w:sz="0" w:color="auto"/><w:right w:val="none" w:sz="0" w:color="auto"/>`;
+  const shd=bg?`<w:shd w:val="clear" w:color="auto" w:fill="${bg}"/>`:"";
+  const jc=center?`<w:jc w:val="center"/>`:right?`<w:jc w:val="right"/>`:`<w:jc w:val="left"/>`;
+  const u=underline?`<w:u w:val="single"/>`:"";
+  const rp=`<w:rPr>${bold?"<w:b/>":""}${u}<w:rFonts w:ascii="${FONT}" w:hAnsi="${FONT}" w:cs="${FONT}"/><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr>`;
+  return `<w:tc><w:tcPr>${gs}<w:tcBorders>${brd}</w:tcBorders>${shd}
+    <w:tcMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/>
+             <w:top w:w="40" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/></w:tcMar>
+  </w:tcPr>
+  <w:p><w:pPr>${SP}${jc}</w:pPr><w:r>${rp}<w:t xml:space="preserve">${esc(text)}</w:t></w:r></w:p>
+  </w:tc>`;
+}
+
+function tbl(rows,vis=false){
+  const tb=vis
+    ?`<w:tblBorders><w:top w:val="single" w:sz="4" w:color="000000"/><w:left w:val="single" w:sz="4" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:color="000000"/><w:right w:val="single" w:sz="4" w:color="000000"/><w:insideH w:val="single" w:sz="4" w:color="000000"/><w:insideV w:val="single" w:sz="4" w:color="000000"/></w:tblBorders>`
+    :`<w:tblBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/><w:insideH w:val="none"/><w:insideV w:val="none"/></w:tblBorders>`;
+  return `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblLayout w:type="fixed"/>${tb}
+    <w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar>
+  </w:tblPr>${rows.join("")}</w:tbl>`;
+}
+
+// =============================================
+//  СБОРКА DOCX
+// =============================================
+function buildDocXml(key,f,persons){
+  const tpl=templates[key],pts=tpl.points(f,persons);
+  const headerTbl=tbl([
+    `<w:tr>${cell(`№ ${f.num}`,{bold:true})}${cell(fmtLong(f.date),{bold:true,right:true})}</w:tr>`,
+    `<w:tr>
+      <w:tc><w:tcPr><w:tcW w:w="3000" w:type="dxa"/>
+        <w:tcBorders><w:top w:val="none" w:sz="0" w:color="auto"/><w:left w:val="none" w:sz="0" w:color="auto"/><w:bottom w:val="none" w:sz="0" w:color="auto"/><w:right w:val="none" w:sz="0" w:color="auto"/></w:tcBorders>
+        <w:tcMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/><w:top w:w="40" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/></w:tcMar>
+      </w:tcPr>
+      <w:p><w:pPr>${SP}<w:jc w:val="left"/></w:pPr><w:r>${rpr(true,SZ)}<w:t xml:space="preserve">${esc(tpl.subject(f))}</w:t></w:r></w:p></w:tc>
+      <w:tc><w:tcPr><w:tcW w:w="2276" w:type="dxa"/>
+        <w:tcBorders><w:top w:val="none" w:sz="0" w:color="auto"/><w:left w:val="none" w:sz="0" w:color="auto"/><w:bottom w:val="none" w:sz="0" w:color="auto"/><w:right w:val="none" w:sz="0" w:color="auto"/></w:tcBorders>
+      </w:tcPr>
+      <w:p><w:pPr>${SP}</w:pPr><w:r>${rpr()}<w:t></w:t></w:r></w:p></w:tc>
+    </w:tr>`,
+  ]);
+  const signTbl=tbl([
+    `<w:tr>${cell(DIRECTOR_POST,{bold:true})}${cell(DIRECTOR,{bold:true,right:true})}</w:tr>`,
+  ]);
+  const heads=["№ п/п","ФИО","Должность","Дата ознакомления","Подпись"];
+  const hRow=`<w:tr>${heads.map(h=>cell(h,{bold:true,sz:SZ_S,vis:true,center:true,bg:"F0F0F0"})).join("")}</w:tr>`;
+  const dRows=[];
+  persons.forEach((p,i)=>{
+    dRows.push(`<w:tr>${cell(String(i+1),{sz:SZ_S,vis:true,center:true})}${cell(p.fio,{sz:SZ_S,vis:true})}${cell(p.position,{sz:SZ_S,vis:true})}${cell(" ",{sz:SZ_S,vis:true})}${cell(" ",{sz:SZ_S,vis:true})}</w:tr>`);
+  });
+  const extra=Math.max(15-persons.length,5);
+  for(let i=persons.length;i<persons.length+extra;i++){
+    dRows.push(`<w:tr>${cell(String(i+1),{sz:SZ_S,vis:true,center:true})}${[" "," "," "," "].map(t=>cell(t,{sz:SZ_S,vis:true})).join("")}</w:tr>`);
+  }
+  const annexTbl=tbl([hRow,...dRows],true);
+  const body=[
+    para("ПРИКАЗ",{bold:true,center:true}),emptyPara(),headerTbl,emptyPara(),
+    para(tpl.preamble(f)),emptyPara(),para("ПРИКАЗЫВАЮ:",{bold:true}),emptyPara(),
+    ...pts.flatMap((p,i)=>[para(`${i+1}. ${p}`),emptyPara()]),
+    signTbl,pageBreak(),
+    para("Приложение № 1",{bold:true,center:true}),
+    para(tpl.annexRef(f),{center:true}),emptyPara(),
+    para("ЛИСТ ОЗНАКОМЛЕНИЯ",{bold:true,center:true,underline:true}),emptyPara(),
+    annexTbl,
+  ].join("\n");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>${body}
+<w:sectPr><w:pgMar w:top="1134" w:right="850" w:bottom="1134" w:left="1701"/></w:sectPr>
+</w:body></w:document>`;
+}
+
+async function downloadDocx(){
+  const key=window._lastKey,f=window._lastValues,persons=window._lastPersons;
+  if(!key||!f||!persons){alert("Сначала сформируйте документ!");return;}
+  if(typeof JSZip==="undefined"){showStatus("❌ JSZip не загрузился.",true);return;}
+  try{
+    const zip=new JSZip();
+    zip.file("[Content_Types].xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
+    zip.file("_rels/.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+    zip.file("word/document.xml",buildDocXml(key,f,persons));
+    zip.file("word/_rels/document.xml.rels",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>`);
+    const blob=await zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download=`${templates[key].name} № ${f.num}.docx`; a.click();
+    URL.revokeObjectURL(url);
+    showStatus("✅ Файл успешно скачан!",false);
+  }catch(e){showStatus("❌ Ошибка: "+e.message,true);console.error(e);}
+}
+
+function copyDoc(){
+  const el=document.getElementById("preview");
+  if(el) navigator.clipboard.writeText(el.innerText).then(()=>alert("Скопировано!"));
+}
+</script>
+</body>
+</html>
